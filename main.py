@@ -44,12 +44,16 @@ TIER_WEIGHT = {"clean": 1.0, "early-access": 0.3, "weak": 0.4}
 # Every launch this contest asks about (the practice four and GTA VI) unlocks
 # at rolling midnight local time on console only, so comparables that did the
 # same count for more than simultaneous-global or PC-including launches.
-ROLLING_WEIGHT = 1.6
-SIMULTANEOUS_WEIGHT = 0.5
-PC_WEIGHT = 0.85
-CONSOLE_ONLY_WEIGHT = 1.45
-# Gaussian kernel bandwidth, in log units, for first-hour scale similarity.
-SCALE_BANDWIDTH = 0.9
+ROLLING_WEIGHT = 1.9
+SIMULTANEOUS_WEIGHT = 0.45
+PC_WEIGHT = 0.78
+CONSOLE_ONLY_WEIGHT = 1.5
+# Gaussian kernel bandwidth, in log units, for first-hour scale similarity,
+# floored so a much bigger launch still hears the structurally similar
+# smaller ones (a mega-launch's own scale peers are mostly PC launches with
+# front-loaded days, unlike a rolling console launch).
+SCALE_BANDWIDTH = 1.0
+SCALE_FLOOR = 0.1
 # The raw cross-launch dispersion is a touch wider than the scored hours need;
 # the band around the median is scaled by this factor.
 SPREAD_SCALE = 0.85
@@ -114,7 +118,8 @@ def comparable_curves(case, first_hour):
             continue
         weight = TIER_WEIGHT[tier] * pattern_weight(comp) * platform_weight(comp)
         scale_gap = abs(math.log(day[0] / first_hour))
-        weight *= math.exp(-0.5 * (scale_gap / SCALE_BANDWIDTH) ** 2)
+        kernel = math.exp(-0.5 * (scale_gap / SCALE_BANDWIDTH) ** 2)
+        weight *= SCALE_FLOOR + (1.0 - SCALE_FLOOR) * kernel
         if weight <= 1e-9:
             continue
         curve = {h: math.log(day[h] / day[0]) for h in range(1, 24) if day.get(h, 0.0) > 0}
